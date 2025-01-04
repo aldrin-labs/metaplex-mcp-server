@@ -1,0 +1,25 @@
+{
+  "type": "module",
+  "name": "metaplex-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "tsc && chmod +x build/index.js",
+    "start": "node build/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "axios": "^1.6.2",
+    "cheerio": "^1.0.0-rc.12",
+    "octokit": "^3.1.2"
+  },
+  "devDependencies": {
+    "@types/cheerio": "^0.22.32",
+    "@types/node": "^20.10.3",
+    "typescript": "^5.7.2"
+  }
+}
