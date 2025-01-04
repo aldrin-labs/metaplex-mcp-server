@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server for accessing Metaplex documentation and repository information.
 
+<a href="https://glama.ai/mcp/servers/mk8rgl7f08"><img width="380" height="200" src="https://glama.ai/mcp/servers/mk8rgl7f08/badge" alt="Metaplex Server MCP server" /></a>
+
 ## Features
 
 - Search Metaplex documentation
