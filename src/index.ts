@@ -3,124 +3,137 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
-  ErrorCode,
-  ListResourcesRequestSchema,
-  ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
   McpError,
-  ReadResourceRequestSchema,
+  ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
-import axios from 'axios';
-import * as cheerio from 'cheerio';
-import * as fs from 'fs';
-import * as path from 'path';
+import {
+  ConnectionManager,
+  RecipeService,
+  EscrowService,
+  FeeService,
+} from './services/index.js';
 
-const GITHUB_API_URL = 'https://api.github.com';
-const METAPLEX_ORG = 'metaplex-foundation';
-const CACHE_DIR = path.join(process.cwd(), '.cache');
-const DOCS_URL = 'https://docs.metaplex.com';
-
-class MetaplexServer {
+class Mpl404Server {
   private server: Server;
-  
+  private recipeService: RecipeService;
+  private escrowService: EscrowService;
+  private feeService: FeeService;
+
   constructor() {
+    // Initialize connection and services
+    const connectionManager = ConnectionManager.getInstance();
+    const connection = connectionManager.getConnection();
+    const program = connectionManager.getProgram();
+
+    this.recipeService = new RecipeService(connection, program);
+    this.escrowService = new EscrowService(connection, program);
+    this.feeService = new FeeService(connection, program);
+
     this.server = new Server(
       {
-        name: 'metaplex-server',
+        name: 'mpl-404-server',
         version: '0.1.0',
       },
       {
         capabilities: {
-          resources: {},
           tools: {},
         },
       }
     );
 
-    this.setupResourceHandlers();
     this.setupToolHandlers();
     
-    // Ensure cache directory exists
-    if (!fs.existsSync(CACHE_DIR)) {
-      fs.mkdirSync(CACHE_DIR, { recursive: true });
-    }
-  }
-
-  private setupResourceHandlers() {
-    this.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-      resources: [
-        {
-          uri: 'metaplex://docs',
-          name: 'Metaplex Documentation',
-          description: 'Complete Metaplex documentation',
-          mimeType: 'text/html'
-        }
-      ],
-    }));
-
-    this.server.setRequestHandler(
-      ListResourceTemplatesRequestSchema,
-      async () => ({
-        resourceTemplates: [
-          {
-            uriTemplate: 'metaplex://repos/{repo}/files/{path}',
-            name: 'Metaplex Repository File',
-            description: 'Access files from Metaplaex repositories',
-            mimeType: 'text/plain'
-          }
-        ],
-      })
-    );
+    this.server.onerror = (error) => console.error('[MCP Error]', error);
+    process.on('SIGINT', async () => {
+      await this.server.close();
+      process.exit(0);
+    });
   }
 
   private setupToolHandlers() {
+    // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
         {
-          name: 'search_docs',
-          description: 'Search Metaplex documentation',
+          name: 'analyze_recipe',
+          description: 'Analyze an MPL-404 recipe configuration',
           inputSchema: {
             type: 'object',
             properties: {
-              query: { type: 'string' }
+              collection: {
+                type: 'string',
+                description: 'Collection address to analyze',
+              },
             },
-            required: ['query']
-          }
+            required: ['collection'],
+          },
         },
         {
-          name: 'get_repo',
-          description: 'Get Metaplaex repository details',
+          name: 'validate_escrow',
+          description: 'Validate an MPL-404 escrow configuration',
           inputSchema: {
             type: 'object',
             properties: {
-              repo: { type: 'string' }
+              collection: {
+                type: 'string',
+                description: 'Collection address to validate',
+              },
+              escrow: {
+                type: 'string',
+                description: 'Escrow address to validate',
+              },
             },
-            required: ['repo']
-          }
+            required: ['collection', 'escrow'],
+          },
         },
         {
-          name: 'search_code',
-          description: 'Search code in Metaplaex repositories',
+          name: 'calculate_fees',
+          description: 'Calculate fees for MPL-404 operations',
           inputSchema: {
             type: 'object',
             properties: {
-              query: { type: 'string' },
-              repo: { type: 'string' }
+              operation: {
+                type: 'string',
+                description: 'Operation type (capture/release)',
+                enum: ['capture', 'release'],
+              },
+              amount: {
+                type: 'number',
+                description: 'Token amount',
+              },
             },
-            required: ['query']
-          }
-        }
+            required: ['operation', 'amount'],
+          },
+        },
+        {
+          name: 'check_conversion_status',
+          description: 'Check NFT/token conversion status',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              asset: {
+                type: 'string',
+                description: 'Asset address to check',
+              },
+            },
+            required: ['asset'],
+          },
+        },
       ],
     }));
 
+    // Handle tool execution
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       switch (request.params.name) {
-        case 'search_docs':
-          return this.handleSearchDocs(request.params.arguments);
-        case 'get_repo':
-          return this.handleGetRepo(request.params.arguments);
-        case 'search_code':
-          return this.handleSearchCode(request.params.arguments);
+        case 'analyze_recipe':
+          return this.handleAnalyzeRecipe(request.params.arguments);
+        case 'validate_escrow':
+          return this.handleValidateEscrow(request.params.arguments);
+        case 'calculate_fees':
+          return this.handleCalculateFees(request.params.arguments);
+        case 'check_conversion_status':
+          return this.handleCheckConversionStatus(request.params.arguments);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,
@@ -130,99 +143,60 @@ class MetaplexServer {
     });
   }
 
-  private async handleSearchDocs(args: any) {
-    const query = args.query;
-    if (typeof query !== 'string') {
-      throw new McpError(ErrorCode.InvalidParams, 'Invalid query parameter');
-    }
-
-    const response = await axios.get(DOCS_URL);
-    const $ = cheerio.load(response.data);
-    const results = $('body')
-      .find('*')
-      .filter((_, el) => $(el).text().includes(query))
-      .map((_, el) => $(el).text())
-      .get();
-
+  private async handleAnalyzeRecipe(args: any) {
+    const result = await this.recipeService.analyzeRecipe(args.collection);
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(results, null, 2)
-        }
-      ]
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
     };
   }
 
-  private async handleGetRepo(args: any) {
-    try {
-      const repo = args.repo || 'metaplex-program-library';
-      console.error(`Fetching repository: ${repo}`);
-      
-      const { data } = await axios.get(`${GITHUB_API_URL}/repos/${METAPLEX_ORG}/${repo}`);
-      
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              name: data.name,
-              description: data.description,
-              stars: data.stargazers_count,
-              forks: data.forks_count,
-              url: data.html_url
-            }, null, 2)
-          }
-        ]
-      };
-    } catch (error: any) {
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Failed to fetch repository: ${error.response?.data?.message || error.message}`
-      );
-    }
-  }
-
-  private async handleSearchCode(args: any) {
-    const { query, repo } = args;
-    if (typeof query !== 'string') {
-      throw new McpError(ErrorCode.InvalidParams, 'Invalid query parameter');
-    }
-
-    const searchUrl = `${GITHUB_API_URL}/search/code?q=${encodeURIComponent(query)}+repo:${METAPLEX_ORG}/${repo || '*'}`;
-    const { data } = await axios.get(searchUrl);
-
+  private async handleValidateEscrow(args: any) {
+    const result = await this.escrowService.validateEscrow(args.collection, args.escrow);
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(data.items.map((item: any) => ({
-            path: item.path,
-            repository: item.repository.full_name,
-            url: item.html_url
-          })), null, 2)
-        }
-      ]
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleCalculateFees(args: any) {
+    const result = await this.feeService.calculateFees(args.operation, args.amount);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleCheckConversionStatus(args: any) {
+    const result = await this.escrowService.checkConversionStatus(args.asset);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
     };
   }
 
   async run() {
     const transport = new StdioServerTransport();
-    
-    // Add timeout for connection
-    const timeout = setTimeout(() => {
-      console.error('MCP connection timed out after 30 seconds');
-      process.exit(1);
-    }, 30000);
-
-    console.error('Attempting to connect to MCP client...');
     await this.server.connect(transport);
-    clearTimeout(timeout);
-    
-    console.error('Metaplex MCP server successfully connected');
-    console.error('Ready to handle requests');
+    console.error('MPL-404 MCP server running on stdio');
   }
 }
 
-const server = new MetaplexServer();
+const server = new Mpl404Server();
 server.run().catch(console.error);
