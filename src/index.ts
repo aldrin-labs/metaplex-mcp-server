@@ -37,7 +37,74 @@ class Mpl404Server {
       },
       {
         capabilities: {
-          tools: {},
+          tools: {
+            analyze_recipe: {
+              name: 'analyze_recipe',
+              description: 'Analyze an MPL-404 recipe configuration',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  collection: {
+                    type: 'string',
+                    description: 'Collection address to analyze',
+                  },
+                },
+                required: ['collection'],
+              },
+            },
+            validate_escrow: {
+              name: 'validate_escrow',
+              description: 'Validate an MPL-404 escrow configuration',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  collection: {
+                    type: 'string',
+                    description: 'Collection address to validate',
+                  },
+                  escrow: {
+                    type: 'string',
+                    description: 'Escrow address to validate',
+                  },
+                },
+                required: ['collection', 'escrow'],
+              },
+            },
+            calculate_fees: {
+              name: 'calculate_fees',
+              description: 'Calculate fees for MPL-404 operations',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  operation: {
+                    type: 'string',
+                    description: 'Operation type (capture/release)',
+                    enum: ['capture', 'release'],
+                  },
+                  amount: {
+                    type: 'number',
+                    description: 'Token amount',
+                  },
+                },
+                required: ['operation', 'amount'],
+              },
+            },
+            check_conversion_status: {
+              name: 'check_conversion_status',
+              description: 'Check NFT/token conversion status',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  asset: {
+                    type: 'string',
+                    description: 'Asset address to check',
+                  },
+                },
+                required: ['asset'],
+              },
+            }
+          },
+          resources: {}
         },
       }
     );

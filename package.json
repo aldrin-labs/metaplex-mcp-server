@@ -12,7 +12,9 @@
     "test:integration": "jest --config jest.integration.config.js",
     "test:e2e": "jest --config jest.e2e.config.js"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.1.0"
+  },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@project-serum/anchor": "^0.26.0",

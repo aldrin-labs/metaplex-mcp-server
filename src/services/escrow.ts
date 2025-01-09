@@ -1,6 +1,6 @@
 import type { Connection as SolanaConnection } from '@solana/web3.js';
 import type { Program as AnchorProgram } from '@project-serum/anchor';
-import { PublicKey } from '../types/mocks';
+import { PublicKey } from '../types/mocks.js';
 
 export interface EscrowValidation {
   collection: string;

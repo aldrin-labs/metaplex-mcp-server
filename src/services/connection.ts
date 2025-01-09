@@ -1,6 +1,14 @@
-import { Connection, clusterApiUrl } from '@solana/web3.js';
+import { Connection, clusterApiUrl, Keypair } from '@solana/web3.js';
 import { Program, AnchorProvider, Idl } from '@project-serum/anchor';
-import { NodeWallet } from '@project-serum/anchor/dist/cjs/provider';
+import { Wallet } from '@project-serum/anchor';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const idl = JSON.parse(await import('fs').then(fs => 
+  fs.promises.readFile(path.resolve(__dirname, '../../reference/idls/mpl_hybrid.json'), 'utf-8')
+));
 
 export class ConnectionManager {
   private static instance: ConnectionManager;
@@ -12,7 +20,7 @@ export class ConnectionManager {
     this.connection = new Connection(clusterApiUrl('devnet'));
     
     // Create a dummy wallet since we're only reading data
-    const wallet = new NodeWallet(null);
+    const wallet = new Wallet(Keypair.generate());
     
     // Create provider
     const provider = new AnchorProvider(this.connection, wallet, {
@@ -21,7 +29,7 @@ export class ConnectionManager {
 
     // Initialize program (this would be replaced with actual MPL-404 program ID and IDL)
     this.program = new Program(
-      {} as Idl, // Replace with actual IDL
+      idl as Idl,
       'MPL4o4wMzndgh8T1NVDxELQCj5UQfYTYEkabX3wNKtb',
       provider
     );
