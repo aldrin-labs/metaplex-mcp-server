@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/aldrin-labs-metaplex-mcp-server-badge.png)](https://mseep.ai/app/aldrin-labs-metaplex-mcp-server)
+
 # Metaplex MCP Server
 
 A Model Context Protocol (MCP) server for accessing Metaplex documentation and repository information.
